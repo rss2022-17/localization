@@ -1,5 +1,7 @@
+#!/usr/bin/env python2
 import numpy as np
 import rospy
+from noise import NoiseModel
 
 
 class MotionModel:
@@ -14,6 +16,7 @@ class MotionModel:
         self.x_scale = rospy.get_param('noise_scale_x', 1)
         self.y_scale = rospy.get_param('noise_scale_y', 1)
         self.theta_scale = rospy.get_param('noise_scale_theta', 1)
+        self.noise_model = NoiseModel(self.x_scale, self.y_scale, self.theta_scale)
 
         ####################################
 
@@ -39,7 +42,6 @@ class MotionModel:
         ####################################
         # TODO
 
-        # raise NotImplementedError
         predicted_particles = np.matrix.copy(particles)
         thetas_cos = np.cos(particles[:,2])
         thetas_sin = np.sin(particles[:,2])
@@ -47,9 +49,10 @@ class MotionModel:
         predicted_particles[:,1] += odometry[0] * thetas_sin + odometry[1] * thetas_cos
         predicted_particles[:,2] += odometry[2]
         if not self.deterministic:
-            predicted_particles[:, 0] += np.random.normal(0, self.x_scale,particles.shape[0])
-            predicted_particles[:, 1] += np.random.normal(0, self.y_scale,particles.shape[0])
-            predicted_particles[:, 2] += np.random.normal(0, self.theta_scale,particles.shape[0])
+            predicted_particles += self.noise_model.get_random_matrix(predicted_particles.shape)
+            # predicted_particles[:, 0] += np.random.normal(0, self.x_scale,particles.shape[0])
+            # predicted_particles[:, 1] += np.random.normal(0, self.y_scale,particles.shape[0])
+            # predicted_particles[:, 2] += np.random.normal(0, self.theta_scale,particles.shape[0])
         return predicted_particles
 
         ####################################
