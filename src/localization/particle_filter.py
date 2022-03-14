@@ -70,6 +70,8 @@ class ParticleFilter:
         self.particles = np.tile(self.initial_pos, (self.n_particles, 1))
         self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
 
+        self.prev_data = None
+        self.odom = np.empty(3)
 
     def laser_callback(self, data):
         #copy points data
@@ -101,7 +103,14 @@ class ParticleFilter:
 
     def motion_callback(self, data):
         #update points data
-        self.particles = self.motion_model.evaluate(self.particles, data)#TODO: make this thread safe
+        if self.prev_data is not None:
+            dt = (data.header.stamp - self.prev_data.header.stamp).to_sec()
+            d_vector = self.prev_data.twist.twist.linear.x * dt
+            self.odom[2] = self.prev_data.twist.twist.angular.z * dt
+            self.odom[0] = np.cos(self.odom[2]) * d_vector
+            self.odom[1] = np.sin(self.odom[2]) * d_vector
+            self.particles = self.motion_model.evaluate(self.particles, self.odom)#TODO: make this thread safe
+        self.prev_data = data
 
     def initialize_callback(self, data):
         theta = tf.transformations.euler_from_quaternion(data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z,data.pose.pose.orientation.w)[2]
