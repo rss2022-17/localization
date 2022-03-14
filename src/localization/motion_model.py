@@ -14,8 +14,7 @@ class MotionModel:
         ####################################
         # Do any precomputation for the motion
         # model here.
-        self.deterministic = rospy.get_param('~deterministic', False)
-        self.noise_model = NoiseModel(self.x_scale, self.y_scale, self.theta_scale)
+        self.deterministic = rospy.get_param('~deterministic', True)
         self.x_scale = rospy.get_param('~noise_scale_x', 1/2*np.cos(np.pi/6))
         self.y_scale = rospy.get_param('~noise_scale_y', 1/2*np.sin(np.pi/6))
         self.theta_scale = rospy.get_param('~noise_scale_theta', np.pi/6)
@@ -23,6 +22,10 @@ class MotionModel:
         self.predicted_particles = np.empty((self.num_particles, 3), dtype=float)
         self.prev_data = None
         self.odom = None
+
+        self.noise_model = NoiseModel(self.x_scale, self.y_scale, self.theta_scale)
+
+        self.zero_prediction = np.zeros(self.predicted_particles.shape)
 
         ####################################
 
@@ -46,17 +49,22 @@ class MotionModel:
         """
         
         ####################################
-        predicted_particles = np.matrix.copy(particles)
-
         thetas_cos = np.cos(particles[:,2])
         thetas_sin = np.sin(particles[:,2])
 
-        self.predicted_particles[:,0] = particles[:,0] + odometry[0] * thetas_cos - odometry[1] * thetas_sin
-        self.predicted_particles[:,1] = particles[:,1] + odometry[0] * thetas_sin + odometry[1] * thetas_cos
-        self.predicted_particles[:,2] = particles[:,2] + odometry[2]
-
+        new_odom = odometry 
         if not self.deterministic:
-            self.predicted_particles += self.noise_model.get_random_matrix(predicted_particles.shape)
+                new_odom = new_odom + self.noise_model.get_random_matrix(self.predicted_particles.shape)
+        else:
+                # still need to reshape new_odom
+                new_odom = new_odom + self.zero_prediction
+
+        self.predicted_particles[:,0] = particles[:,0] + new_odom[:,0] * thetas_cos - new_odom[:,1] * thetas_sin # dx1
+        self.predicted_particles[:,1] = particles[:,1] + new_odom[:,0] * thetas_sin + new_odom[:,1] * thetas_cos
+        self.predicted_particles[:,2] = particles[:,2] + new_odom[:,2]
+
+        # if not self.deterministic:
+        #     self.predicted_particles += self.noise_model.get_random_matrix(self.predicted_particles.shape) # d x 3
         return self.predicted_particles
 
         ####################################
