@@ -69,6 +69,8 @@ class SensorModel:
         returns:
             No return type. Directly modify `self.sensor_model_table`.
         """
+
+        # Z_max  = 200
         raise NotImplementedError
 
     def evaluate(self, particles, observation):
