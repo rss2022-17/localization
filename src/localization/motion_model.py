@@ -12,7 +12,6 @@ class MotionModel:
                                          self.callback,  # TODO: Fill this in
                                          queue_size=1)
         ####################################
-        # TODO
         # Do any precomputation for the motion
         # model here.
         self.deterministic = rospy.get_param('~deterministic', False)
@@ -47,15 +46,15 @@ class MotionModel:
         """
         
         ####################################
-        # TODO
-
         predicted_particles = np.matrix.copy(particles)
-        # raise NotImplementedError
+
         thetas_cos = np.cos(particles[:,2])
         thetas_sin = np.sin(particles[:,2])
+
         self.predicted_particles[:,0] = particles[:,0] + odometry[0] * thetas_cos - odometry[1] * thetas_sin
         self.predicted_particles[:,1] = particles[:,1] + odometry[0] * thetas_sin + odometry[1] * thetas_cos
         self.predicted_particles[:,2] = particles[:,2] + odometry[2]
+
         if not self.deterministic:
             self.predicted_particles += self.noise_model.get_random_matrix(predicted_particles.shape)
         return self.predicted_particles
