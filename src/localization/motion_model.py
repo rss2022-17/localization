@@ -14,11 +14,11 @@ class MotionModel:
         ####################################
         # Do any precomputation for the motion
         # model here.
-        self.deterministic = rospy.get_param('~deterministic', True)
+        self.deterministic = rospy.get_param('~deterministic', False)
         self.x_scale = rospy.get_param('~noise_scale_x', 1/2*np.cos(np.pi/6))
         self.y_scale = rospy.get_param('~noise_scale_y', 1/2*np.sin(np.pi/6))
         self.theta_scale = rospy.get_param('~noise_scale_theta', np.pi/6)
-        self.num_particles = 50 # rospy.get_param('num_particles', 200)
+        self.num_particles = rospy.get_param('num_particles', 200) # 50 for unit test
         self.predicted_particles = np.empty((self.num_particles, 3), dtype=float)
         self.prev_data = None
         self.odom = None
