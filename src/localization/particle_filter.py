@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+import threading
 import rospy
 import tf
 from sensor_model import SensorModel
@@ -68,17 +69,25 @@ class ParticleFilter:
         self.n_particles = 200
         self.initial_pos = np.array([0,0,0])
         self.particles = np.tile(self.initial_pos, (self.n_particles, 1))
+        self.particles_copy = np.tile(self.initial_pos, (self.n_particles, 1))
         self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
 
         self.prev_data = None
         self.odom = np.empty(3)
+
+        #Mutexes for thread safety
+        self.particle_lock = threading.Lock()
+        self.prob_lock = threading.Lock()
 
     def laser_callback(self, data):
         #copy points data
         #(ignoring for now, TODO:make this thread safe)
 
         #call sensor model, update probabilities
-        self.probs = self.sensor_model.evaluate(self.particles, data.ranges)
+        with self.particles_lock:
+            self.particles_copy = self.particles
+        
+        self.probs = self.sensor_model.evaluate(self.particles_copy, data.ranges)
 
         #'average' points--rn just picking max probability
         max_i = np.argmax(self.probs)
@@ -98,7 +107,8 @@ class ParticleFilter:
         msg.pose.pose.orientation.w = quat[3]
         
         self.odom_pub.publish(msg)
-        self.particles = np.random.Generator.choice(self.particles, size=(self.n_particles), p=self.probs) #resample
+        with self.particles_lock:
+            self.particles = np.random.Generator.choice(self.particles, size=(self.n_particles), p=self.probs) #resample
 
 
     def motion_callback(self, data):
@@ -109,15 +119,16 @@ class ParticleFilter:
             self.odom[2] = self.prev_data.twist.twist.angular.z * dt
             self.odom[0] = np.cos(self.odom[2]) * d_vector
             self.odom[1] = np.sin(self.odom[2]) * d_vector
-            self.particles = self.motion_model.evaluate(self.particles, self.odom)#TODO: make this thread safe
+            with self.particles_lock:
+                self.particles = self.motion_model.evaluate(self.particles, self.odom)
         self.prev_data = data
 
     def initialize_callback(self, data):
         theta = tf.transformations.euler_from_quaternion(data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z,data.pose.pose.orientation.w)[2]
         self.initial_pos = np.array([data.pose.pose.position.x,data.pose.pose.position.y,theta])
-
-        self.particles = np.tile(self.initial_pos, (self.n_particles, 1))
-        self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
+        with self.particles_lock:
+            self.particles = np.tile(self.initial_pos, (self.n_particles, 1))
+            self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
 
 if __name__ == "__main__":
     rospy.init_node("particle_filter")
