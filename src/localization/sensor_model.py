@@ -93,7 +93,6 @@ class SensorModel:
                the probability of each particle existing
                given the observation and the map.
         """
-
         if not self.map_set:
             return
 
@@ -105,7 +104,28 @@ class SensorModel:
         # to perform ray tracing from all the particles.
         # This produces a matrix of size N x num_beams_per_particle 
 
-        scans = self.scan_sim.scan(particles)
+        divisor = self.map.info.resolution * rospy.get_param("~lidar_scale_to_map_scale")
+        N = particles.shape[0] # Number of particles
+        scans = self.scan_sim.scan(particles) # Ray Tracing
+        #Now has an N by num_lidar beams matrix
+        lidar_scan_distances = np.array([min (particle.ranges) for particle in scans])
+        ray_cast_distances = np.array([min(particle.ranges) for particle in observation])
+
+
+
+        #Clips ray cast distances so that distances < 0 become 0, and distances >z_max become z_max
+        lidar_distances = np.clip(lidar_scan_distances/divisor, 0, 201)
+
+        #Clips ray cast distances so that distances < 0 become 0, and distances >z_max become z_max
+        ray_cast_distances = np.clip(ray_cast_scan_distances/divisor, 0, 201)
+        
+        #Distance tuples, containg pair of real distance to measured distance
+        distances = [(ray_cast_distances[i], lidar_distances[i]) for i in range(N)]
+        
+        #Uses precomputed table to get probabilities
+        #pair is tuple of (true distance, measured distance)
+        probabilites = np.array([self.sensor_model_table[pair[0], pair[1]] for pair in distances])
+        return probabilites
 
         ####################################
 
