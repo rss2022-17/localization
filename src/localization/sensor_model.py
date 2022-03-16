@@ -9,7 +9,7 @@ from tf.transformations import quaternion_from_euler
 class SensorModel:
 
 
-    def __init__(self):
+    def __init__(self, z_max):
         # Fetch parameters
         self.map_topic = rospy.get_param("~map_topic")
         self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle")
@@ -24,7 +24,7 @@ class SensorModel:
         self.alpha_max = 0
         self.alpha_rand = 0
         self.sigma_hit = 0
-
+        self.z_max = z_max
         # Your sensor table will be a `table_width` x `table_width` np array:
         self.table_width = 201
         ####################################
@@ -69,6 +69,8 @@ class SensorModel:
         returns:
             No return type. Directly modify `self.sensor_model_table`.
         """
+
+        # Z_max  = 200
         raise NotImplementedError
 
     def evaluate(self, particles, observation):
@@ -91,7 +93,6 @@ class SensorModel:
                the probability of each particle existing
                given the observation and the map.
         """
-
         if not self.map_set:
             return
 
@@ -103,7 +104,22 @@ class SensorModel:
         # to perform ray tracing from all the particles.
         # This produces a matrix of size N x num_beams_per_particle 
 
-        scans = self.scan_sim.scan(particles)
+        divisor = self.map.info.resolution * rospy.get_param("~lidar_scale_to_map_scale")
+        N = particles.shape[0] # Number of particles
+        z_k = observation # 1 x N
+
+        scans = self.scan_sim.scan(particles) # Ray Tracing
+        #Now has an N by num_lidar beams matrix
+
+        #Clips and scales ray cast distances
+        adjusted_ray_cast = np.clip(scans/divisor, 0, 200.0) # n by m scaled and clipped 
+        adjusted_lidar_scan = np.clip(observation/divisor, 0, 200.0) # n by 1cd scaled and clipped 
+
+        probability_table = self.sensor_model_table[observation, adjusted_ray_cast]
+        
+        #Turn a n by m matrix into a n by 1 (or 1 by n) vector where each element is the product of each row in the probability table
+        probabilites = np.prod(probability_table, axis = 1)
+        return probabilites
 
         ####################################
 
