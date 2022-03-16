@@ -76,7 +76,7 @@ class ParticleFilter:
         self.odom = np.empty(3)
 
         #Mutexes for thread safety
-        self.particle_lock = threading.Lock()
+        self.particles_lock = threading.Lock()
         self.prob_lock = threading.Lock()
 
     def laser_callback(self, data):
@@ -87,7 +87,7 @@ class ParticleFilter:
         with self.particles_lock:
             self.particles_copy = self.particles
         
-        self.probs = self.sensor_model.evaluate(self.particles_copy, data.ranges)
+        self.probs = self.sensor_model.evaluate(self.particles_copy, np.array(data.ranges))
 
         #'average' points--rn just picking max probability
         max_i = np.argmax(self.probs)
@@ -96,11 +96,11 @@ class ParticleFilter:
         msg = Odometry()
         msg.header.stamp = rospy.Time.now()
         msg.header.frame_id = "/map"
-        msg.pose.pose.position.x = self.points[max_i][0]
-        msg.pose.pose.position.y = self.points[max_i][1]
+        msg.pose.pose.position.x = self.particles[max_i][0]
+        msg.pose.pose.position.y = self.particles[max_i][1]
         msg.pose.pose.position.z = 0 
 
-        quat = tf.transformations.quaternion_from_euler(0,0,self.points[max_i][2])
+        quat = tf.transformations.quaternion_from_euler(0,0,self.particles[max_i][2])
         msg.pose.pose.orientation.x = quat[0]
         msg.pose.pose.orientation.y = quat[1]
         msg.pose.pose.orientation.z = quat[2]
@@ -108,7 +108,9 @@ class ParticleFilter:
         
         self.odom_pub.publish(msg)
         with self.particles_lock:
-            self.particles = np.random.Generator.choice(self.particles, size=(self.n_particles), p=self.probs) #resample
+          #            self.particles = np.random.choice(self.particles, size=(self.n_particles), p=self.probs) #resample
+            indices = np.random.choice(self.particles.shape[0], self.n_particles, p = self.probs)
+            self.particles = self.particles[indices]
 
 
     def motion_callback(self, data):
@@ -124,7 +126,7 @@ class ParticleFilter:
         self.prev_data = data
 
     def initialize_callback(self, data):
-        theta = tf.transformations.euler_from_quaternion(data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z,data.pose.pose.orientation.w)[2]
+        theta = tf.transformations.euler_from_quaternion((data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z,data.pose.pose.orientation.w))[2]
         self.initial_pos = np.array([data.pose.pose.position.x,data.pose.pose.position.y,theta])
         with self.particles_lock:
             self.particles = np.tile(self.initial_pos, (self.n_particles, 1))

@@ -107,7 +107,7 @@ class SensorModel:
         
         p_col_sums = p.sum(axis = 0)  # normalize
         p = p / p_col_sums[np.newaxis,:]
-
+        self.sensor_model_table = p.T
 #        self.sensor_model_plot(p)
 
     def sensor_model_plot(self, p_matrix):
@@ -158,7 +158,7 @@ class SensorModel:
         # to perform ray tracing from all the particles.
         # This produces a matrix of size N x num_beams_per_particle 
 
-        divisor = self.map.info.resolution * rospy.get_param("~lidar_scale_to_map_scale")
+        divisor = self.map_resolution * rospy.get_param("~lidar_scale_to_map_scale")
         N = particles.shape[0] # Number of particles
         z_k = observation # 1 x N
 
@@ -166,14 +166,16 @@ class SensorModel:
         #Now has an N by num_lidar beams matrix
 
         #Clips and scales ray cast distances
-        adjusted_ray_cast = np.clip(scans/divisor, 0, 200.0) # n by m scaled and clipped 
-        adjusted_lidar_scan = np.clip(observation/divisor, 0, 200.0) # n by 1cd scaled and clipped 
+        adjusted_ray_cast = np.clip(scans/divisor, 0, 200.0).astype(int) # n by m scaled and clipped 
+        adjusted_lidar_scan = np.clip(observation/divisor, 0, 200.0).astype(int) # n by 1cd scaled and clipped 
 
-        probability_table = self.sensor_model_table[observation, adjusted_ray_cast]
-        
+        probability_table = self.sensor_model_table[adjusted_lidar_scan, adjusted_ray_cast]
         #Turn a n by m matrix into a n by 1 (or 1 by n) vector where each element is the product of each row in the probability table
-        probabilites = np.prod(probability_table, axis = 1)
-        return probabilites
+        probabilities = np.prod(probability_table, axis = 1)
+        probabilities = probabilities**(1/2.2)
+        print(probabilities)
+        probabilities /= np.linalg.norm(probabilities)
+        return probabilities
 
         ####################################
 
@@ -182,6 +184,7 @@ class SensorModel:
         self.map = np.array(map_msg.data, np.double)/100.
         self.map = np.clip(self.map, 0, 1)
 
+        self.map_resolution = map_msg.info.resolution
         # Convert the origin to a tuple
         origin_p = map_msg.info.origin.position
         origin_o = map_msg.info.origin.orientation
