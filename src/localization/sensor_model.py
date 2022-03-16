@@ -1,6 +1,11 @@
 import numpy as np
 from scan_simulator_2d import PyScanSimulator2D
 
+import matplotlib
+import matplotlib.pyplot as plt
+import scipy
+from mpl_toolkits.mplot3d import Axes3D
+
 import rospy
 import tf
 from nav_msgs.msg import OccupancyGrid
@@ -70,8 +75,58 @@ class SensorModel:
             No return type. Directly modify `self.sensor_model_table`.
         """
 
-        # Z_max  = 200
-        raise NotImplementedError
+        z_max  = 200.0
+        normalization_constant = 1.0
+
+        d = np.linspace(0,z_max,self.table_width,endpoint = True)
+        z = np.linspace(0,z_max,self.table_width,endpoint = True)
+
+        # p_hit
+
+        p_hit = (normalization_constant/np.sqrt(2.0*np.pi*self.sigma_hit**2))*np.exp(np.square(d[:,np.newaxis] - z)/(-2*self.sigma_hit**2))
+
+        p_hit_col_sums = p_hit.sum(axis = 0) # normalize
+        p_hit = p_hit / p_hit_col_sums[np.newaxis,:]
+
+        # p_short
+
+        p_short_cond = (2.0/d[1:,np.newaxis])*(1-(z/d[1:,np.newaxis])) # condition d != 0
+
+        p_short = np.zeros((self.table_width,self.table_width))
+        p_short[1:,:] = p_short_cond
+        p_short = np.tril(p_short,0) # condition: 0 <= zk <= d
+
+        # p_max
+
+        p_max = np.zeros((self.table_width,self.table_width))
+        p_max[:,-1] = 1
+
+        # p_rand
+        p_rand = np.full((self.table_width,self.table_width),1/z_max)
+
+        p = self.alpha_hit*p_hit + self.alpha_short*p_short + self.alpha_max*p_max + self.alpha_rand*p_rand
+        
+        p_col_sums = p.sum(axis = 0)  # normalize
+        p = p / p_col_sums[np.newaxis,:]
+
+        self.sensor_model_plot(p)
+
+    def sensor_model_plot(self, p_matrix):
+        # https://gist.github.com/CMCDragonkai/dd420c0800cba33142505eff5a7d2589
+        (x,y) = np.meshgrid(np.arange(p_matrix.shape[0]), np.arange(p_matrix.shape[1]))
+        fig = plt.figure()
+        ax = fig.add_subplot(111,projection = '3d')
+        surf = ax.plot_surface(x,y,p_matrix)
+
+        ax.invert_xaxis()
+
+        fig.colorbar(surf)
+
+        ax.set_xlabel('X (cols)')
+        ax.set_ylabel('Y (rows)')
+        ax.set_zlabel('Z (values)')
+
+        matplotlib.pyplot.show()
 
     def evaluate(self, particles, observation):
         """
