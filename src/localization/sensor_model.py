@@ -9,7 +9,7 @@ from tf.transformations import quaternion_from_euler
 class SensorModel:
 
 
-    def __init__(self):
+    def __init__(self, z_max):
         # Fetch parameters
         self.map_topic = rospy.get_param("~map_topic")
         self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle")
@@ -24,7 +24,7 @@ class SensorModel:
         self.alpha_max = 0
         self.alpha_rand = 0
         self.sigma_hit = 0
-
+        self.z_max = z_max
         # Your sensor table will be a `table_width` x `table_width` np array:
         self.table_width = 201
         ####################################
@@ -106,25 +106,19 @@ class SensorModel:
 
         divisor = self.map.info.resolution * rospy.get_param("~lidar_scale_to_map_scale")
         N = particles.shape[0] # Number of particles
+        z_k = observation # 1 x N
+
         scans = self.scan_sim.scan(particles) # Ray Tracing
         #Now has an N by num_lidar beams matrix
-        lidar_scan_distances = np.array([min (particle.ranges) for particle in scans])
-        ray_cast_distances = np.array([min(particle.ranges) for particle in observation])
 
+        #Clips and scales ray cast distances
+        adjusted_ray_cast = np.clip(scans/divisor, 0, self.z_max) # n by m scaled and clipped 
+        adjusted_lidar_scan = np.clip(observation/divisor, 0, self.z_max) # n by 1cd scaled and clipped 
 
-
-        #Clips ray cast distances so that distances < 0 become 0, and distances >z_max become z_max
-        lidar_distances = np.clip(lidar_scan_distances/divisor, 0, 201)
-
-        #Clips ray cast distances so that distances < 0 become 0, and distances >z_max become z_max
-        ray_cast_distances = np.clip(ray_cast_scan_distances/divisor, 0, 201)
+        probability_table = self.sensor_model_table[observation, adjusted_ray_cast]
         
-        #Distance tuples, containg pair of real distance to measured distance
-        distances = [(ray_cast_distances[i], lidar_distances[i]) for i in range(N)]
-        
-        #Uses precomputed table to get probabilities
-        #pair is tuple of (true distance, measured distance)
-        probabilites = np.array([self.sensor_model_table[pair[0], pair[1]] for pair in distances])
+        #Turn a n by m matrix into a n by 1 (or 1 by n) vector where each element is the product of each row in the probability table
+        probabilites = np.prod(probability_table, axis = 1)
         return probabilites
 
         ####################################
