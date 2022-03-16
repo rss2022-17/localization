@@ -3,7 +3,6 @@ from scan_simulator_2d import PyScanSimulator2D
 
 import matplotlib
 import matplotlib.pyplot as plt
-import scipy
 from mpl_toolkits.mplot3d import Axes3D
 
 import rospy
@@ -14,7 +13,7 @@ from tf.transformations import quaternion_from_euler
 class SensorModel:
 
 
-    def __init__(self, z_max):
+    def __init__(self, z_max=200):
         # Fetch parameters
         self.map_topic = rospy.get_param("~map_topic")
         self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle")
@@ -24,11 +23,11 @@ class SensorModel:
         ####################################
         # TODO
         # Adjust these parameters
-        self.alpha_hit = 0
-        self.alpha_short = 0
-        self.alpha_max = 0
-        self.alpha_rand = 0
-        self.sigma_hit = 0
+        self.alpha_hit = 0.74
+        self.alpha_short = 0.07
+        self.alpha_max = 0.07
+        self.alpha_rand = 0.12
+        self.sigma_hit = 0.5
         self.z_max = z_max
         # Your sensor table will be a `table_width` x `table_width` np array:
         self.table_width = 201
@@ -109,7 +108,7 @@ class SensorModel:
         p_col_sums = p.sum(axis = 0)  # normalize
         p = p / p_col_sums[np.newaxis,:]
 
-        self.sensor_model_plot(p)
+#        self.sensor_model_plot(p)
 
     def sensor_model_plot(self, p_matrix):
         # https://gist.github.com/CMCDragonkai/dd420c0800cba33142505eff5a7d2589
