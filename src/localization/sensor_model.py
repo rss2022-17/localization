@@ -112,8 +112,8 @@ class SensorModel:
         #Now has an N by num_lidar beams matrix
 
         #Clips and scales ray cast distances
-        adjusted_ray_cast = np.clip(scans/divisor, 0, self.z_max) # n by m scaled and clipped 
-        adjusted_lidar_scan = np.clip(observation/divisor, 0, self.z_max) # n by 1cd scaled and clipped 
+        adjusted_ray_cast = np.clip(scans/divisor, 0, 200.0) # n by m scaled and clipped 
+        adjusted_lidar_scan = np.clip(observation/divisor, 0, 200.0) # n by 1cd scaled and clipped 
 
         probability_table = self.sensor_model_table[observation, adjusted_ray_cast]
         
