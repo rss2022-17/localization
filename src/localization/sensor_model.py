@@ -104,6 +104,8 @@ class SensorModel:
         # to perform ray tracing from all the particles.
         # This produces a matrix of size N x num_beams_per_particle 
 
+        #z_max to be initialized and changed elsewhere, 200.0 set here for testing purposes.
+        z_max = 200.0 
         divisor = self.map.info.resolution * rospy.get_param("~lidar_scale_to_map_scale")
         N = particles.shape[0] # Number of particles
         z_k = observation # 1 x N
@@ -112,8 +114,8 @@ class SensorModel:
         #Now has an N by num_lidar beams matrix
 
         #Clips and scales ray cast distances
-        adjusted_ray_cast = np.clip(scans/divisor, 0, 200.0) # n by m scaled and clipped 
-        adjusted_lidar_scan = np.clip(observation/divisor, 0, 200.0) # n by 1cd scaled and clipped 
+        adjusted_ray_cast = np.clip(scans/divisor, 0, z_max) # n by m scaled and clipped 
+        adjusted_lidar_scan = np.clip(observation/divisor, 0, z_max) # n by 1cd scaled and clipped 
 
         probability_table = self.sensor_model_table[observation, adjusted_ray_cast]
         
