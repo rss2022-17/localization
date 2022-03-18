@@ -84,9 +84,11 @@ class SensorModel:
 
         p_hit = (normalization_constant/np.sqrt(2.0*np.pi*self.sigma_hit**2))*np.exp(np.square(d[:,np.newaxis] - z)/(-2*self.sigma_hit**2))
 
-        p_hit_col_sums = p_hit.sum(axis = 0) # normalize
-        p_hit = p_hit / p_hit_col_sums[np.newaxis,:]
+        p_hit_col_sums = p_hit.sum(axis = 1) # normalize
+        p_hit = p_hit / p_hit_col_sums.reshape(self.table_width,1)
 
+        rospy.logwarn("p_hit!!!")
+        rospy.logwarn(p_hit)
         # p_short
 
         p_short_cond = (2.0/d[1:,np.newaxis])*(1-(z/d[1:,np.newaxis])) # condition d != 0
@@ -95,19 +97,25 @@ class SensorModel:
         p_short[1:,:] = p_short_cond
         p_short = np.tril(p_short,0) # condition: 0 <= zk <= d
 
+        rospy.logwarn("p_short_cond!!!")
+        rospy.logwarn(p_short_cond)
         # p_max
 
         p_max = np.zeros((self.table_width,self.table_width))
         p_max[:,-1] = 1
 
+        rospy.logwarn("p_max!!!")
+        rospy.logwarn(p_max)
+
         # p_rand
-        p_rand = np.full((self.table_width,self.table_width),1/z_max)
+        p_rand = np.full((self.table_width,self.table_width),1.0/(z_max))
 
         p = self.alpha_hit*p_hit + self.alpha_short*p_short + self.alpha_max*p_max + self.alpha_rand*p_rand
         
-        p_col_sums = p.sum(axis = 0)  # normalize
-        p = p / p_col_sums[np.newaxis,:]
+        p_col_sums = p.sum(axis = 1)  # normalize
+        p = p / p_col_sums.reshape(self.table_width,1)
         self.sensor_model_table = p.T
+        #self.sensor_model_table = p.T
 #        self.sensor_model_plot(p)
 
     def sensor_model_plot(self, p_matrix):
