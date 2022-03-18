@@ -174,15 +174,15 @@ class SensorModel:
         #Now has an N by num_lidar beams matrix
 
         #Clips and scales ray cast distances
-        adjusted_ray_cast = np.clip(scans/divisor, 0, 200.0).astype(int) # n by m scaled and clipped 
-        adjusted_lidar_scan = np.clip(observation/divisor, 0, 200.0).astype(int) # n by 1cd scaled and clipped 
+        adjusted_ray_cast = np.rint(np.clip(scans/divisor, 0, 200.0)).astype(np.uint16) # n by m scaled and clipped 
+        adjusted_lidar_scan = np.rint(np.clip(observation/divisor, 0, 200.0)).astype(np.uint16) # n by 1cd scaled and clipped 
 
         probability_table = self.sensor_model_table[adjusted_lidar_scan, adjusted_ray_cast]
         #Turn a n by m matrix into a n by 1 (or 1 by n) vector where each element is the product of each row in the probability table
         probabilities = np.prod(probability_table, axis = 1)
-        probabilities = probabilities**(1/2.2)
-        print(probabilities)
-        probabilities /= np.linalg.norm(probabilities)
+        probabilities = np.power(probabilities,1/2.2)
+        #print(probabilities)
+        #probabilities = probabilities/np.sum(probabilities)
         return probabilities
 
         ####################################
