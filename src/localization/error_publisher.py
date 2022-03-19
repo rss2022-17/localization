@@ -21,8 +21,17 @@ class ErrorPublisher:
     def callback(self, data):
 
         try: 
-
             transform = self.tfbuffer.lookup_transform("base_link", "map", rospy.Time())
+        except:
+            print("couldn't get the transform from frame:map to frame:base_link")
+            
+        (currPosition, currQuaternion) = (transform.transform.translation, transform.transform.rotation)
+        x,y,z = (currPosition.x, currPosition.y, currPosition.z)
+        theta = tf.transformations.euler_from_quaternion((currQuaternion.x, currQuaternion.y, currQuaternion.z, currQuaternion.w))[2]
+
+        estimated_position = data.pose.pose.position
+        estimated_angle = 
+
             
 
 
