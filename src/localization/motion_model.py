@@ -18,7 +18,7 @@ class MotionModel:
         self.x_scale = rospy.get_param('~noise_scale_x', 1/2*np.cos(np.pi/6))
         self.y_scale = rospy.get_param('~noise_scale_y', 1/2*np.sin(np.pi/6))
         self.theta_scale = rospy.get_param('~noise_scale_theta', np.pi/6)
-        self.num_particles = rospy.get_param('num_particles', 200) # 50 for unit test
+        self.num_particles = rospy.get_param('~num_particles', 200) # 50 for unit test
         self.predicted_particles = np.empty((self.num_particles, 3), dtype=float)
         self.prev_data = None
         self.odom = None
@@ -46,6 +46,7 @@ class MotionModel:
         returns:
             particles: An updated matrix of the
                 same size
+        print(adjusted_ray_cast) particles particles
         """
         
         ####################################
@@ -53,12 +54,12 @@ class MotionModel:
         thetas_sin = np.sin(particles[:,2])
 
         new_odom = odometry 
+
         if not self.deterministic:
                 new_odom = new_odom + self.noise_model.get_random_matrix(self.predicted_particles.shape)
         else:
                 # still need to reshape new_odom
                 new_odom = new_odom + self.zero_prediction
-
         self.predicted_particles[:,0] = particles[:,0] + new_odom[:,0] * thetas_cos - new_odom[:,1] * thetas_sin # dx1
         self.predicted_particles[:,1] = particles[:,1] + new_odom[:,0] * thetas_sin + new_odom[:,1] * thetas_cos
         self.predicted_particles[:,2] = particles[:,2] + new_odom[:,2]

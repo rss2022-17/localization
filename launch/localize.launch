@@ -2,4 +2,9 @@
   <node pkg="localization" type="particle_filter.py" name="particle_filter" output="screen">
     <rosparam command="load" file="$(find localization)/params.yaml"/>
   </node>
+  <include file="$(find racecar_simulator)/launch/simulate.launch">
+    <!--<arg name="map" value="$(find localization)/test/maps/test_map.yaml"/>-->
+    <arg name="map" value="$(find racecar_simulator)/maps/building_31.yaml"/>-->
+    
+  </include>
 </launch>

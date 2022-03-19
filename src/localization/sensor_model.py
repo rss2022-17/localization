@@ -159,7 +159,7 @@ class SensorModel:
             return
 
         ####################################
-        # TODO
+        # TODOn
         # Evaluate the sensor model here!
         #
         # You will probably want to use this function
@@ -182,7 +182,7 @@ class SensorModel:
         probabilities = np.prod(probability_table, axis = 1)
         probabilities = np.power(probabilities,1/2.2)
         #print(probabilities)
-        #probabilities = probabilities/np.sum(probabilities)
+        probabilities = probabilities/np.sum(probabilities)
         return probabilities
 
         ####################################
