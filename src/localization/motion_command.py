@@ -25,7 +25,7 @@ class DrivingCommands:
         
         while not rospy.is_shutdown():
             self.steer_pub.publish(drive)
-            print("commanding!")
+            #print("commanding!")
             rate.sleep()
 
 

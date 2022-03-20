@@ -3,12 +3,13 @@ import numpy as np
 import threading
 import rospy
 import tf
+import tf2_ros
 from sensor_model import SensorModel
 from motion_model import MotionModel
 
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, Point, Quaternion
 
 
 class ParticleFilter:
@@ -52,7 +53,8 @@ class ParticleFilter:
         #     odometry you publish here should be with respect to the
         #     "/map" frame.
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
-        
+
+
         # Initialize the models
         self.motion_model = MotionModel()
         self.sensor_model = SensorModel()
@@ -78,6 +80,11 @@ class ParticleFilter:
         #Mutexes for thread safety
         self.particles_lock = threading.Lock()
         self.prob_lock = threading.Lock()
+
+        #For tracking error
+        self.error_pub = rospy.Publisher("odom_error", Odometry, queue_size = 1)
+        self.tfBuffer = tf2_ros.Buffer()
+        self.tfListener = tf2_ros.TransformListener(self.tfBuffer)
 
     def laser_callback(self, data):
         #copy points data
@@ -107,6 +114,10 @@ class ParticleFilter:
         msg.pose.pose.orientation.w = quat[3]
         
         self.odom_pub.publish(msg)
+
+        #Sends esimated pose to error publisher for comparing against real pose and then publishing error
+        self.error_publisher(msg)
+        
         with self.particles_lock:
           #            self.particles = np.random.choice(self.particles, size=(self.n_particles), p=self.probs) #resample
             indices = np.random.choice(self.particles.shape[0], self.n_particles, p = self.probs)
@@ -131,6 +142,38 @@ class ParticleFilter:
         with self.particles_lock:
             self.particles = np.tile(self.initial_pos, (self.n_particles, 1))
             self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
+
+    def error_publisher(self, data):
+        try: 
+            transform = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time())
+        except:
+            print("couldn't get the transform from frame:map to frame:base_link")
+
+        (currPosition, currQuaternion) = (transform.transform.translation, transform.transform.rotation)
+        position = np.array([currPosition.x, currPosition.y, currPosition.z])
+        quaternion = np.array([currQuaternion.x, currQuaternion.y, currQuaternion.z, currQuaternion.w])
+
+        estimated_position = data.pose.pose.position
+        estimated_quat = data.pose.pose.orientation
+
+        estimated_position = np.array([estimated_position.x, estimated_position.y, estimated_position.z])
+        estimated_quat = np.array([estimated_quat.x, estimated_quat.y, estimated_quat.z, estimated_quat.w])
+        
+        
+        error_position = Point()
+        error_position.x, error_position.y, error_position.z = estimated_position-position
+
+        error_rotation = Quaternion()
+        error_rotation.x, error_rotation.y, error_rotation.z, error_rotation.w = estimated_quat - quaternion
+
+        odom = Odometry()
+        odom.header.stamp = rospy.Time.now()
+        odom.header.frame_id = "/map"
+        odom.pose.pose.position = error_position
+        odom.pose.pose.orientation = error_rotation
+
+        self.error_pub.publish(odom)
+        
 
 if __name__ == "__main__":
     rospy.init_node("particle_filter")
