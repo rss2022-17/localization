@@ -180,9 +180,10 @@ class SensorModel:
         probability_table = self.sensor_model_table[adjusted_lidar_scan, adjusted_ray_cast]
         #Turn a n by m matrix into a n by 1 (or 1 by n) vector where each element is the product of each row in the probability table
         probabilities = np.prod(probability_table, axis = 1)
+        #print(sum(probabilities))
         probabilities = np.power(probabilities,1/2.2)
         #print(probabilities)
-        probabilities = probabilities/np.sum(probabilities)
+        #probabilities = probabilities/np.sum(probabilities)
         return probabilities
 
         ####################################

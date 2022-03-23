@@ -94,7 +94,9 @@ class ParticleFilter:
         with self.particles_lock:
             self.particles_copy = self.particles
         
+        #Get and Normalize Probabilities From Sensor Model
         self.probs = self.sensor_model.evaluate(self.particles_copy, np.array(data.ranges))
+        self.probs = self.probs/np.sum(self.probs)
 
         #'average' points--rn just picking max probability
         max_i = np.argmax(self.probs)
@@ -117,6 +119,8 @@ class ParticleFilter:
 
         #Sends esimated pose to error publisher for comparing against real pose and then publishing error
         self.error_publisher(msg)
+        
+
         
         with self.particles_lock:
           #            self.particles = np.random.choice(self.particles, size=(self.n_particles), p=self.probs) #resample
