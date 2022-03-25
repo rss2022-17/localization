@@ -19,6 +19,14 @@ class ParticleFilter:
         self.particle_filter_frame = \
                 rospy.get_param("~particle_filter_frame")
 
+        self.n_particles = rospy.get_param("~num_particles")
+        self.initIsDone = False
+
+
+        #For thread safety
+        self.particles_lock = threading.Lock()
+        self.prob_lock = threading.Lock()
+
         # Initialize publishers/subscribers
         #
         #  *Important Note #1:* It is critical for your particle
@@ -68,34 +76,35 @@ class ParticleFilter:
         #
         # Publish a transformation frame between the map
         # and the particle_filter_frame.
-        self.n_particles = 200
+
         self.initial_pos = np.array([0,0,0])
         self.particles = np.tile(self.initial_pos, (self.n_particles, 1))
         self.particles_copy = np.tile(self.initial_pos, (self.n_particles, 1))
         self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
-
         self.prev_data = None
         self.odom = np.empty(3)
-
-        #Mutexes for thread safety
-        self.particles_lock = threading.Lock()
-        self.prob_lock = threading.Lock()
 
         #For tracking error
         self.error_pub = rospy.Publisher("odom_error", Odometry, queue_size = 1)
         self.tfBuffer = tf2_ros.Buffer()
         self.tfListener = tf2_ros.TransformListener(self.tfBuffer)
+        
+        self.initIsDone = True
 
     def laser_callback(self, data):
         #copy points data
         #(ignoring for now, TODO:make this thread safe)
-
+        if not self.initIsDone:
+            return
         #call sensor model, update probabilities
         with self.particles_lock:
             self.particles_copy = self.particles
         
         #Get and Normalize Probabilities From Sensor Model
+        
         self.probs = self.sensor_model.evaluate(self.particles_copy, np.array(data.ranges))
+        if self.probs is None:
+            return
         self.probs = self.probs/np.sum(self.probs)
 
         #'average' points--rn just picking max probability
@@ -130,6 +139,8 @@ class ParticleFilter:
 
     def motion_callback(self, data):
         #update points data
+        if not self.initIsDone:
+            return
         if self.prev_data is not None:
             dt = (data.header.stamp - self.prev_data.header.stamp).to_sec()
             d_vector = self.prev_data.twist.twist.linear.x * dt
@@ -150,33 +161,38 @@ class ParticleFilter:
     def error_publisher(self, data):
         try: 
             transform = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time())
+            (currPosition, currQuaternion) = (transform.transform.translation, transform.transform.rotation)
+            position = np.array([currPosition.x, currPosition.y, currPosition.z])
+            quaternion = np.array([currQuaternion.x, currQuaternion.y, currQuaternion.z, currQuaternion.w])
+
+            estimated_position = data.pose.pose.position
+            estimated_quat = data.pose.pose.orientation
+
+            estimated_position = np.array([estimated_position.x, estimated_position.y, estimated_position.z])
+            estimated_quat = np.array([estimated_quat.x, estimated_quat.y, estimated_quat.z, estimated_quat.w])
+            
+            
+            error_position = Point()
+            error_position.x, error_position.y, error_position.z = estimated_position - position
+
+
+            error_rotation = Quaternion()
+            error_rotation.x, error_rotation.y, error_rotation.z, error_rotation.w = estimated_quat - quaternion
+
+
+
+            odom = Odometry()
+            odom.header.stamp = rospy.Time.now()
+            odom.header.frame_id = "/map"
+            odom.pose.pose.position = error_position
+            odom.pose.pose.orientation = error_rotation
+
+            
+            #rospy.loginfo(true_angle - estimated_angle)
+            self.error_pub.publish(odom)
         except:
             print("couldn't get the transform from frame:map to frame:base_link")
 
-        (currPosition, currQuaternion) = (transform.transform.translation, transform.transform.rotation)
-        position = np.array([currPosition.x, currPosition.y, currPosition.z])
-        quaternion = np.array([currQuaternion.x, currQuaternion.y, currQuaternion.z, currQuaternion.w])
-
-        estimated_position = data.pose.pose.position
-        estimated_quat = data.pose.pose.orientation
-
-        estimated_position = np.array([estimated_position.x, estimated_position.y, estimated_position.z])
-        estimated_quat = np.array([estimated_quat.x, estimated_quat.y, estimated_quat.z, estimated_quat.w])
-        
-        
-        error_position = Point()
-        error_position.x, error_position.y, error_position.z = estimated_position-position
-
-        error_rotation = Quaternion()
-        error_rotation.x, error_rotation.y, error_rotation.z, error_rotation.w = estimated_quat - quaternion
-
-        odom = Odometry()
-        odom.header.stamp = rospy.Time.now()
-        odom.header.frame_id = "/map"
-        odom.pose.pose.position = error_position
-        odom.pose.pose.orientation = error_rotation
-
-        self.error_pub.publish(odom)
         
 
 if __name__ == "__main__":

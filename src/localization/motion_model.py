@@ -78,7 +78,7 @@ class MotionModel:
             self.odom[2] = self.prev_data.twist.twist.angular.z * dt
             self.odom[0] = np.cos(self.odom[2]) * d_vector
             self.odom[1] = np.sin(self.odom[2]) * d_vector
-            print dt, self.odom
+            #print dt, self.odom
         self.prev_data = data
 
 if __name__ == "__main__":

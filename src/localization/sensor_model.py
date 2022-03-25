@@ -19,6 +19,7 @@ class SensorModel:
         self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle")
         self.scan_theta_discretization = rospy.get_param("~scan_theta_discretization")
         self.scan_field_of_view = rospy.get_param("~scan_field_of_view")
+        self.lidar_scale_to_map_scale = rospy.get_param("~lidar_scale_to_map_scale", 1.0)
 
         ####################################
         # TODO
@@ -165,14 +166,13 @@ class SensorModel:
         # You will probably want to use this function
         # to perform ray tracing from all the particles.
         # This produces a matrix of size N x num_beams_per_particle 
-
-        divisor = self.map_resolution * rospy.get_param("~lidar_scale_to_map_scale")
+        divisor = self.map_resolution * self.lidar_scale_to_map_scale
         N = particles.shape[0] # Number of particles
         z_k = observation # 1 x N
 
         scans = self.scan_sim.scan(particles) # Ray Tracing
         #Now has an N by num_lidar beams matrix
-
+        
         #Clips and scales ray cast distances
         adjusted_ray_cast = np.rint(np.clip(scans/divisor, 0, 200.0)).astype(np.uint16) # n by m scaled and clipped 
         adjusted_lidar_scan = np.rint(np.clip(observation/divisor, 0, 200.0)).astype(np.uint16) # n by 1cd scaled and clipped 
@@ -184,6 +184,8 @@ class SensorModel:
         probabilities = np.power(probabilities,1/2.2)
         #print(probabilities)
         #probabilities = probabilities/np.sum(probabilities)
+        if (probabilities is None):
+            print("self.prob is none")
         return probabilities
 
         ####################################
