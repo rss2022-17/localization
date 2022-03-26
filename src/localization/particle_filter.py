@@ -94,6 +94,8 @@ class ParticleFilter:
     def laser_callback(self, data):
         #copy points data
         #(ignoring for now, TODO:make this thread safe)
+
+        #Only start accepting data once initialization is done
         if not self.initIsDone:
             return
         #call sensor model, update probabilities
@@ -107,18 +109,33 @@ class ParticleFilter:
             return
         self.probs = self.probs/np.sum(self.probs)
 
+        #Resampling
+        with self.particles_lock:
+          #            self.particles = np.random.choice(self.particles, size=(self.n_particles), p=self.probs) #resample
+            indices = np.random.choice(self.particles.shape[0], self.n_particles, p = self.probs)
+            self.particles = self.particles[indices]
+
+
         #'average' points--rn just picking max probability
-        max_i = np.argmax(self.probs)
+        #max_i = np.argmax(self.probs)
+            
         
+        #Compute average pose and publish it
+        mu_x = np.mean(self.particles[:, 0])
+        mu_y = np.mean(self.particles[:, 1])
+        angles = self.particles[:, 2]
+        mu_theta = np.arctan2(np.sum(np.sin(angles)), np.sum(np.cos(angles)))
+
+
         #publish odometry
         msg = Odometry()
         msg.header.stamp = rospy.Time.now()
         msg.header.frame_id = "/map"
-        msg.pose.pose.position.x = self.particles[max_i][0]
-        msg.pose.pose.position.y = self.particles[max_i][1]
+        msg.pose.pose.position.x = mu_x #self.particles[max_i][0]
+        msg.pose.pose.position.y = mu_y #self.particles[max_i][1]
         msg.pose.pose.position.z = 0 
 
-        quat = tf.transformations.quaternion_from_euler(0,0,self.particles[max_i][2])
+        quat = tf.transformations.quaternion_from_euler(0,0, mu_theta)
         msg.pose.pose.orientation.x = quat[0]
         msg.pose.pose.orientation.y = quat[1]
         msg.pose.pose.orientation.z = quat[2]
@@ -130,15 +147,12 @@ class ParticleFilter:
         self.error_publisher(msg)
         
 
-        
-        with self.particles_lock:
-          #            self.particles = np.random.choice(self.particles, size=(self.n_particles), p=self.probs) #resample
-            indices = np.random.choice(self.particles.shape[0], self.n_particles, p = self.probs)
-            self.particles = self.particles[indices]
 
 
     def motion_callback(self, data):
         #update points data
+
+        #Only start accepting data once initialization is done
         if not self.initIsDone:
             return
         if self.prev_data is not None:
@@ -149,6 +163,33 @@ class ParticleFilter:
             self.odom[1] = np.sin(self.odom[2]) * d_vector
             with self.particles_lock:
                 self.particles = self.motion_model.evaluate(self.particles, self.odom)
+
+            #Compute average and publish pose
+            mu_x = np.mean(self.particles[:, 0])
+            mu_y = np.mean(self.particles[:, 1])
+            angles = self.particles[:, 2]
+            mu_theta = np.arctan2(np.sum(np.sin(angles)), np.sum(np.cos(angles)))
+
+            #publish odometry
+            msg = Odometry()
+            msg.header.stamp = rospy.Time.now()
+            msg.header.frame_id = "/map"
+            msg.pose.pose.position.x = mu_x
+            msg.pose.pose.position.y = mu_y
+            msg.pose.pose.position.z = 0 
+
+            quat = tf.transformations.quaternion_from_euler(0,0,mu_theta)
+            msg.pose.pose.orientation.x = quat[0]
+            msg.pose.pose.orientation.y = quat[1]
+            msg.pose.pose.orientation.z = quat[2]
+            msg.pose.pose.orientation.w = quat[3]
+            
+            self.odom_pub.publish(msg)
+
+            #Sends esimated pose to error publisher for comparing against real pose and then publishing error
+            self.error_publisher(msg)
+
+            
         self.prev_data = data
 
     def initialize_callback(self, data):
