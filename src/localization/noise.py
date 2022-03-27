@@ -24,6 +24,6 @@ class NoiseModel:
 
 
 if __name__ == "__main__":
-    nm = NoiseModel(1, 50, 3)
+    nm = NoiseModel(5, 5, 3)
     #for _ in range(2):
     #    print(nm.get_random_matrix((10,3)))

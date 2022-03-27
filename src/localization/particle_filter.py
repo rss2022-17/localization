@@ -83,6 +83,7 @@ class ParticleFilter:
         self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
         self.prev_data = None
         self.odom = np.empty(3)
+        self.diff = np.empty(3)
 
         #For tracking error
         self.error_pub = rospy.Publisher("odom_error", Odometry, queue_size = 1)
@@ -157,10 +158,26 @@ class ParticleFilter:
             return
         if self.prev_data is not None:
             dt = (data.header.stamp - self.prev_data.header.stamp).to_sec()
-            d_vector = self.prev_data.twist.twist.linear.x * dt
+
+            # currX, currY = (data.pose.pose.position.x, data.pose.pose.position.y)
+            # prevX, prevY = (self.prev_data.pose.pose.position.x, self.prev_data.pose.pose.position.y)
+            # quatToNp = lambda q: np.array([q.x, q.y,q.z,q.w])
+            # currAngle = tf.transformations.euler_from_quaternion(quatToNp(data.pose.pose.orientation))[2]
+            # prevAngle = tf.transformations.euler_from_quaternion(quatToNp(self.prev_data.pose.pose.orientation))[2]
+            # sin = np.sin(prevAngle)
+            # cos = np.cos(prevAngle)
+            # rot_T = np.array([[cos, -sin, 0], [sin, cos, 0], [0, 0, 1]]).T
+            # self.diff[0] = currX- prevX
+            # self.diff[1] = currY - prevY
+            # self.diff[2] = currAngle - prevAngle
+            # self.odom = np.matmul(rot_T, self.diff) * dt
+
+            
+            dx_vector = self.prev_data.twist.twist.linear.x * dt
+            dy_vector = self.prev_data.twist.twist.linear.y * dt
             self.odom[2] = self.prev_data.twist.twist.angular.z * dt
-            self.odom[0] = np.cos(self.odom[2]) * d_vector
-            self.odom[1] = np.sin(self.odom[2]) * d_vector
+            self.odom[0] = np.cos(self.odom[2]) * dx_vector + np.sin(self.odom[2]) * dy_vector 
+            self.odom[1] = -np.sin(self.odom[2]) * dx_vector + np.cos(self.odom[2]) * dy_vector
             with self.particles_lock:
                 self.particles = self.motion_model.evaluate(self.particles, self.odom)
 
@@ -218,6 +235,8 @@ class ParticleFilter:
 
 
             error_rotation = Quaternion()
+            #rot = np.matmul(estimated_quat, np.linalg.inv(quaternion))
+            #error_rotation.x , error_rotation.y, error_rotation.z, error_rotation.w = (rot[0], rot[1], rot[2], rot[3])
             error_rotation.x, error_rotation.y, error_rotation.z, error_rotation.w = estimated_quat - quaternion
 
 

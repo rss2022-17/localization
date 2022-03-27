@@ -17,11 +17,11 @@ class DrivingCommands:
 
         drive = AckermannDriveStamped()
         drive.header.stamp = rospy.Time()
-        drive.drive.steering_angle = .4
+        drive.drive.steering_angle = .5
         drive.drive.steering_angle_velocity = 0
 
         rate = rospy.Rate(20)
-        drive.drive.speed = 0
+        drive.drive.speed = .5
         
         while not rospy.is_shutdown():
             self.steer_pub.publish(drive)
