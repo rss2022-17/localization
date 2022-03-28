@@ -84,7 +84,6 @@ class ParticleFilter:
         self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
         self.prev_data = None
         self.odom = np.empty(3)
-        self.diff = np.empty(3)
 
         #For tracking error
         self.error_pub = rospy.Publisher("odom_error", Odometry, queue_size = 1)
@@ -97,6 +96,7 @@ class ParticleFilter:
         #copy points data
         #(ignoring for now, TODO:make this thread safe)
 
+        
         #Only start accepting data once initialization is done
         if not self.initIsDone:
             return
@@ -146,7 +146,7 @@ class ParticleFilter:
         self.odom_pub.publish(msg)
 
         #Sends esimated pose to error publisher for comparing against real pose and then publishing error
-        self.error_publisher(msg)
+        #self.error_publisher(msg)
         
 
 
@@ -159,53 +159,38 @@ class ParticleFilter:
             return
         if self.prev_data is not None:
             dt = (data.header.stamp - self.prev_data.header.stamp).to_sec()
-
-            # currX, currY = (data.pose.pose.position.x, data.pose.pose.position.y)
-            # prevX, prevY = (self.prev_data.pose.pose.position.x, self.prev_data.pose.pose.position.y)
-            # quatToNp = lambda q: np.array([q.x, q.y,q.z,q.w])
-            # currAngle = tf.transformations.euler_from_quaternion(quatToNp(data.pose.pose.orientation))[2]
-            # prevAngle = tf.transformations.euler_from_quaternion(quatToNp(self.prev_data.pose.pose.orientation))[2]
-            # sin = np.sin(prevAngle)
-            # cos = np.cos(prevAngle)
-            # rot_T = np.array([[cos, -sin, 0], [sin, cos, 0], [0, 0, 1]]).T
-            # self.diff[0] = currX- prevX
-            # self.diff[1] = currY - prevY
-            # self.diff[2] = currAngle - prevAngle
-            # self.odom = np.matmul(rot_T, self.diff) * dt
-
-            
-            dx_vector = self.prev_data.twist.twist.linear.x * dt
-            dy_vector = self.prev_data.twist.twist.linear.y * dt
-            self.odom[2] = self.prev_data.twist.twist.angular.z * dt
-            self.odom[0] = np.cos(self.odom[2]) * dx_vector + np.sin(self.odom[2]) * dy_vector 
-            self.odom[1] = -np.sin(self.odom[2]) * dx_vector + np.cos(self.odom[2]) * dy_vector
+            dx = data.twist.twist.linear.x * dt
+            dy = data.twist.twist.linear.y * dt
+            self.odom[2] = data.twist.twist.angular.z * dt
+            self.odom[0] = dx
+            self.odom[1] = dy
             with self.particles_lock:
                 self.particles = self.motion_model.evaluate(self.particles, self.odom)
 
             #Compute average and publish pose
-            mu_x = np.mean(self.particles[:, 0])
-            mu_y = np.mean(self.particles[:, 1])
-            angles = self.particles[:, 2]
-            mu_theta = np.arctan2(np.sum(np.sin(angles)), np.sum(np.cos(angles)))
+                mu_x = np.mean(self.particles[:, 0])
+                mu_y = np.mean(self.particles[:, 1])
+                angles = self.particles[:, 2]
+                mu_theta = np.arctan2(np.sum(np.sin(angles)), np.sum(np.cos(angles)))
 
-            #publish odometry
-            msg = Odometry()
-            msg.header.stamp = rospy.Time.now()
-            msg.header.frame_id = "/map"
-            msg.pose.pose.position.x = mu_x
-            msg.pose.pose.position.y = mu_y
-            msg.pose.pose.position.z = 0 
+                #publish odometry
+                msg = Odometry()
+                msg.header.stamp = rospy.Time.now()
+                msg.header.frame_id = "/map"
+                msg.pose.pose.position.x = mu_x
+                msg.pose.pose.position.y = mu_y
+                msg.pose.pose.position.z = 0 
 
-            quat = tf.transformations.quaternion_from_euler(0,0,mu_theta)
-            msg.pose.pose.orientation.x = quat[0]
-            msg.pose.pose.orientation.y = quat[1]
-            msg.pose.pose.orientation.z = quat[2]
-            msg.pose.pose.orientation.w = quat[3]
-            
-            self.odom_pub.publish(msg)
+                quat = tf.transformations.quaternion_from_euler(0,0,mu_theta)
+                msg.pose.pose.orientation.x = quat[0]
+                msg.pose.pose.orientation.y = quat[1]
+                msg.pose.pose.orientation.z = quat[2]
+                msg.pose.pose.orientation.w = quat[3]
+                
+                self.odom_pub.publish(msg)
 
             #Sends esimated pose to error publisher for comparing against real pose and then publishing error
-            self.error_publisher(msg)
+            #self.error_publisher(msg)
 
             
         self.prev_data = data
@@ -255,7 +240,7 @@ class ParticleFilter:
         except:
             print("couldn't get the transform from frame:map to frame:base_link")
 
-    def pose_ransac(self, radius = 0.5, theta = np.pi/4, steps=50):
+    def pose_ransac(self, radius = 0.2, ang_thresh= .7, steps=50):
         best_point = None
         best_inliers = 0 #count of points close to best point
         best_inliers_vec = None #actual vector of those points (so we dont; need to recalculate)
@@ -266,10 +251,17 @@ class ParticleFilter:
             with self.probs_lock:
                 ind = np.random.choice(self.particles.shape[0],1, p = self.probs) #sample from particles using probabilities
             pt = self.particles_ransac[ind]
+            #print(pt.shape)
             inliers = 0
             err_vec = self.particles_ransac-pt
-            inliers_dist = np.power(err_vec[0,:],2) + np.power(err_vec[1,:],2)<radius #points within distance requirement of sampled point
-            inliers_ang = err_vec[2,:]<theta #points within angle requirement of sampled point TODO:FIX CIRCULAR PROBLEM HERE
+            inliers_dist = np.power(err_vec[:, 0],2) + np.power(err_vec[:, 1],2)<radius #points within distance requirement of sampled point
+            #inliers_ang = np.abs(err_vec[2,:])<theta #points within angle requirement of sampled point TODO:FIX CIRCULAR PROBLEM HERE
+            
+            coses = np.cos(self.particles_ransac[:,2])
+            sines = np.sin(self.particles_ransac[:,2])
+            ang_err_vec = coses*np.cos(pt[0,2]) + sines*np.sin(pt[0,2])
+            inliers_ang = ang_err_vec > ang_thresh
+            
             inliers_vec = np.logical_and(inliers_dist, inliers_ang)#points within distance and angle requirement
             inliers = np.count_nonzero(inliers_vec)
             if inliers > best_inliers:
@@ -277,9 +269,11 @@ class ParticleFilter:
                 best_point = pt
                 best_inliers_vec = inliers_vec
 
-        mu_x = np.mean(self.particles_ransac[:,best_inliers_vec][:, 0])
-        mu_y = np.mean(self.particles_ransac[:,best_inliers_vec][:, 1])
-        angles = self.particles_ransac[:,best_inliers_vec][:, 2]
+        
+
+        mu_x = np.mean(self.particles_ransac[best_inliers_vec, :][:, 0])
+        mu_y = np.mean(self.particles_ransac[best_inliers_vec, :][:, 1])
+        angles = self.particles_ransac[best_inliers_vec, :][:, 2]
         mu_theta = np.arctan2(np.sum(np.sin(angles)), np.sum(np.cos(angles)))
         return mu_x, mu_y, mu_theta
                 

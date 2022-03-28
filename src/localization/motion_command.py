@@ -12,18 +12,28 @@ class DrivingCommands:
     def __init__(self):
 
         self.steer_pub = rospy.Publisher(self.DRIVE_TOPIC, AckermannDriveStamped, queue_size = 10)
+        self.last_time = rospy.Time.now()
+        self.turn_threshold = 3
+        self.left = True
     def command(self):
 
 
         drive = AckermannDriveStamped()
         drive.header.stamp = rospy.Time()
-        drive.drive.steering_angle = .5
+        drive.drive.steering_angle = 0.0
         drive.drive.steering_angle_velocity = 0
 
         rate = rospy.Rate(20)
-        drive.drive.speed = .5
+        drive.drive.speed = 1
         
         while not rospy.is_shutdown():
+            if rospy.Time.now().to_sec() - self.last_time.to_sec() > self.turn_threshold:
+                if self.left:
+                    drive.drive.steering_angle = .1
+                else:
+                    drive.drive.steering_angle = -.1
+                self.left = not self.left
+                self.last_time = rospy.Time.now()
             self.steer_pub.publish(drive)
             #print("commanding!")
             rate.sleep()

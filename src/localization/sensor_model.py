@@ -181,11 +181,10 @@ class SensorModel:
         #Turn a n by m matrix into a n by 1 (or 1 by n) vector where each element is the product of each row in the probability table
         probabilities = np.prod(probability_table, axis = 1)
         #print(sum(probabilities))
-        probabilities = np.power(probabilities,1/2.2)
+        #probabilities = np.power(probabilities,1/2.2)
         #print(probabilities)
         #probabilities = probabilities/np.sum(probabilities)
-        if (probabilities is None):
-            print("self.prob is none")
+    
         return probabilities
 
         ####################################
