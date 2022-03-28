@@ -25,7 +25,7 @@ class ParticleFilter:
 
         #For thread safety
         self.particles_lock = threading.Lock()
-        self.prob_lock = threading.Lock()
+        self.probs_lock = threading.Lock()
 
         # Initialize publishers/subscribers
         #
@@ -77,9 +77,10 @@ class ParticleFilter:
         # Publish a transformation frame between the map
         # and the particle_filter_frame.
 
-        self.initial_pos = np.array([0,0,0])
+        self.initial_pos = np.array([0.0,0.0,0.0])
         self.particles = np.tile(self.initial_pos, (self.n_particles, 1))
         self.particles_copy = np.tile(self.initial_pos, (self.n_particles, 1))
+        self.particles_ransac = np.tile(self.initial_pos, (self.n_particles, 1))
         self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
         self.prev_data = None
         self.odom = np.empty(3)
@@ -104,11 +105,11 @@ class ParticleFilter:
             self.particles_copy = self.particles
         
         #Get and Normalize Probabilities From Sensor Model
-        
-        self.probs = self.sensor_model.evaluate(self.particles_copy, np.array(data.ranges))
-        if self.probs is None:
-            return
-        self.probs = self.probs/np.sum(self.probs)
+        with self.probs_lock:
+            self.probs = self.sensor_model.evaluate(self.particles_copy, np.array(data.ranges))
+            if self.probs is None:
+                return
+            self.probs = self.probs/np.sum(self.probs)
 
         #Resampling
         with self.particles_lock:
@@ -122,11 +123,11 @@ class ParticleFilter:
             
         
         #Compute average pose and publish it
-        mu_x = np.mean(self.particles[:, 0])
-        mu_y = np.mean(self.particles[:, 1])
-        angles = self.particles[:, 2]
-        mu_theta = np.arctan2(np.sum(np.sin(angles)), np.sum(np.cos(angles)))
-
+        #mu_x = np.mean(self.particles[:, 0])
+        #mu_y = np.mean(self.particles[:, 1])
+        #angles = self.particles[:, 2]
+        #mu_theta = np.arctan2(np.sum(np.sin(angles)), np.sum(np.cos(angles)))
+        mu_x, mu_y, mu_theta = self.pose_ransac()
 
         #publish odometry
         msg = Odometry()
@@ -214,6 +215,7 @@ class ParticleFilter:
         self.initial_pos = np.array([data.pose.pose.position.x,data.pose.pose.position.y,theta])
         with self.particles_lock:
             self.particles = np.tile(self.initial_pos, (self.n_particles, 1))
+        with self.probs_lock:
             self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
 
     def error_publisher(self, data):
@@ -253,7 +255,34 @@ class ParticleFilter:
         except:
             print("couldn't get the transform from frame:map to frame:base_link")
 
+    def pose_ransac(self, radius = 0.5, theta = np.pi/4, steps=50):
+        best_point = None
+        best_inliers = 0 #count of points close to best point
+        best_inliers_vec = None #actual vector of those points (so we dont; need to recalculate)
         
+        with self.particles_lock:
+            self.particles_ransac = self.particles
+        for i in range(steps):
+            with self.probs_lock:
+                ind = np.random.choice(self.particles.shape[0],1, p = self.probs) #sample from particles using probabilities
+            pt = self.particles_ransac[ind]
+            inliers = 0
+            err_vec = self.particles_ransac-pt
+            inliers_dist = np.power(err_vec[0,:],2) + np.power(err_vec[1,:],2)<radius #points within distance requirement of sampled point
+            inliers_ang = err_vec[2,:]<theta #points within angle requirement of sampled point TODO:FIX CIRCULAR PROBLEM HERE
+            inliers_vec = np.logical_and(inliers_dist, inliers_ang)#points within distance and angle requirement
+            inliers = np.count_nonzero(inliers_vec)
+            if inliers > best_inliers:
+                best_inliers = inliers
+                best_point = pt
+                best_inliers_vec = inliers_vec
+
+        mu_x = np.mean(self.particles_ransac[:,best_inliers_vec][:, 0])
+        mu_y = np.mean(self.particles_ransac[:,best_inliers_vec][:, 1])
+        angles = self.particles_ransac[:,best_inliers_vec][:, 2]
+        mu_theta = np.arctan2(np.sum(np.sin(angles)), np.sum(np.cos(angles)))
+        return mu_x, mu_y, mu_theta
+                
 
 if __name__ == "__main__":
     rospy.init_node("particle_filter")
