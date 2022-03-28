@@ -255,7 +255,7 @@ class ParticleFilter:
         except:
             print("couldn't get the transform from frame:map to frame:base_link")
 
-    def pose_ransac(self, radius = 0.5, theta = np.pi/4, steps=50):
+    def pose_ransac(self, radius = 0.5, ang_thresh = 0.75, steps=50):
         best_point = None
         best_inliers = 0 #count of points close to best point
         best_inliers_vec = None #actual vector of those points (so we dont; need to recalculate)
@@ -269,8 +269,14 @@ class ParticleFilter:
             inliers = 0
             err_vec = self.particles_ransac-pt
             inliers_dist = np.power(err_vec[0,:],2) + np.power(err_vec[1,:],2)<radius #points within distance requirement of sampled point
-            inliers_ang = err_vec[2,:]<theta #points within angle requirement of sampled point TODO:FIX CIRCULAR PROBLEM HERE
+            #inliers_ang = np.logical_or(err_vec[2,:]<theta, err_vec[2,:]+2*np.pi<theta) #points within angle requirement of sampled point
+
+            coses = np.cos(self.particles_ransac[2:])
+            sines = np.cos(self.particles_ransac[2:])
+            ang_err_vec = coses*np.cos(pt[2]) + sines*np.sin(pt[2])
+            inliers_ang = ang_err_vec>ang_thresh
             inliers_vec = np.logical_and(inliers_dist, inliers_ang)#points within distance and angle requirement
+
             inliers = np.count_nonzero(inliers_vec)
             if inliers > best_inliers:
                 best_inliers = inliers
