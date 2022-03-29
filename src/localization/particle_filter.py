@@ -9,7 +9,7 @@ from motion_model import MotionModel
 
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseWithCovarianceStamped, Point, Quaternion
+from geometry_msgs.msg import PoseWithCovarianceStamped, Point, Quaternion, PoseArray, Pose
 
 
 class ParticleFilter:
@@ -61,7 +61,8 @@ class ParticleFilter:
         #     odometry you publish here should be with respect to the
         #     "/map" frame.
         self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
-
+        self.particles_pub = rospy.Publisher("/pf/particles", PoseArray, queue_size = 1)
+        self.visualize = True
 
         # Initialize the models
         self.motion_model = MotionModel()
@@ -87,6 +88,7 @@ class ParticleFilter:
 
         #For tracking error
         self.error_pub = rospy.Publisher("odom_error", Odometry, queue_size = 1)
+        self.particles_pub = rospy.Publisher("/pf/particles",PoseArray, queue_size = 1)
         self.tfBuffer = tf2_ros.Buffer()
         self.tfListener = tf2_ros.TransformListener(self.tfBuffer)
         
@@ -147,7 +149,25 @@ class ParticleFilter:
 
         #Sends esimated pose to error publisher for comparing against real pose and then publishing error
         #self.error_publisher(msg)
-        
+        if self.visualize:
+            cloud = PoseArray()
+            cloud.header.stamp = rospy.Time.now()
+            cloud.header.frame_id = "/map"
+            odoms = []
+            for particle in self.particles:
+                odom = Pose()
+                odom.position.x = particle[0]
+                odom.position.y = particle[1]
+                odom.position.z = 0
+                quat = tf.transformations.quaternion_from_euler(0,0, particle[2])
+                odom.orientation.x = quat[0]
+                odom.orientation.y = quat[1]
+                odom.orientation.z = quat[2]
+                odom.orientation.w = quat[3]
+                odoms.append(odom)
+
+            cloud.poses = odoms
+            self.particles_pub.publish(cloud)
 
 
 
