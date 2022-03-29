@@ -93,9 +93,6 @@ class ParticleFilter:
         self.initIsDone = True
 
     def laser_callback(self, data):
-        #copy points data
-        #(ignoring for now, TODO:make this thread safe)
-
         
         #Only start accepting data once initialization is done
         if not self.initIsDone:
@@ -113,21 +110,15 @@ class ParticleFilter:
 
         #Resampling
         with self.particles_lock:
-          #            self.particles = np.random.choice(self.particles, size=(self.n_particles), p=self.probs) #resample
             indices = np.random.choice(self.particles.shape[0], self.n_particles, p = self.probs)
             self.particles = self.particles[indices]
-
-
-        #'average' points--rn just picking max probability
-        #max_i = np.argmax(self.probs)
-            
-        
+                    
         #Compute average pose and publish it
-        #mu_x = np.mean(self.particles[:, 0])
-        #mu_y = np.mean(self.particles[:, 1])
-        #angles = self.particles[:, 2]
-        #mu_theta = np.arctan2(np.sum(np.sin(angles)), np.sum(np.cos(angles)))
-        mu_x, mu_y, mu_theta = self.pose_ransac()
+        mu_x = np.mean(self.particles[:, 0])
+        mu_y = np.mean(self.particles[:, 1])
+        angles = self.particles[:, 2]
+        mu_theta = np.arctan2(np.sum(np.sin(angles)), np.sum(np.cos(angles)))
+        #mu_x, mu_y, mu_theta = self.pose_ransac()
 
         #publish odometry
         msg = Odometry()
@@ -142,7 +133,7 @@ class ParticleFilter:
         msg.pose.pose.orientation.y = quat[1]
         msg.pose.pose.orientation.z = quat[2]
         msg.pose.pose.orientation.w = quat[3]
-        
+            
         self.odom_pub.publish(msg)
 
         #Sends esimated pose to error publisher for comparing against real pose and then publishing error
@@ -186,7 +177,7 @@ class ParticleFilter:
                 msg.pose.pose.orientation.y = quat[1]
                 msg.pose.pose.orientation.z = quat[2]
                 msg.pose.pose.orientation.w = quat[3]
-                
+                    
                 self.odom_pub.publish(msg)
 
             #Sends esimated pose to error publisher for comparing against real pose and then publishing error
@@ -240,7 +231,7 @@ class ParticleFilter:
         except:
             print("couldn't get the transform from frame:map to frame:base_link")
 
-    def pose_ransac(self, radius = 0.2, ang_thresh= .7, steps=50):
+    def pose_ransac(self, radius = 0.2, ang_thresh= .7, steps=300):
         best_point = None
         best_inliers = 0 #count of points close to best point
         best_inliers_vec = None #actual vector of those points (so we dont; need to recalculate)
