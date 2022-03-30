@@ -37,7 +37,7 @@ class ParticleFilter:
         #     twist component, so you should rely only on that
         #     information, and *not* use the pose component.
         scan_topic = rospy.get_param("~scan_topic", "/scan")
-        odom_topic = rospy.get_param("~odom_topic", "/odom")
+        odom_topic = rospy.get_param("~odom_topic", "/vesc/odom")
         self.laser_sub = rospy.Subscriber(scan_topic, LaserScan,
                                           self.laser_callback, # TODO: Fill this in
                                           queue_size=1)
@@ -95,11 +95,11 @@ class ParticleFilter:
         self.initIsDone = True
 
     def laser_callback(self, data):
-        
+        return 
         #Only start accepting data once initialization is done
         if not self.initIsDone:
             return
-        if len(data.ranges) != rospy.get_param("~/num_beams_per_particle"):
+        if len(data.ranges) != rospy.get_param("~num_beams_per_particle"):
             return
         #call sensor model, update probabilities
        
@@ -200,7 +200,6 @@ class ParticleFilter:
                 msg.pose.pose.orientation.y = quat[1]
                 msg.pose.pose.orientation.z = quat[2]
                 msg.pose.pose.orientation.w = quat[3]
-                    
                 self.odom_pub.publish(msg)
 
             #Sends esimated pose to error publisher for comparing against real pose and then publishing error
