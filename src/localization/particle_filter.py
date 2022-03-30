@@ -61,6 +61,7 @@ class ParticleFilter:
         #     odometry you publish here should be with respect to the
         #     "/map" frame.
         self.odom_pub  = rospy.Publisher(rospy.get_param("~particle_filter_frame", "/base_link"), Odometry, queue_size = 1)
+        self.tf_pub = tf.TransformBroadcaster()
         self.particles_pub = rospy.Publisher("/pf/particles", PoseArray, queue_size = 1)
         self.visualize = True
 
@@ -95,12 +96,11 @@ class ParticleFilter:
         self.initIsDone = True
 
     def laser_callback(self, data):
-        return 
         #Only start accepting data once initialization is done
         if not self.initIsDone:
             return
-        if len(data.ranges) != rospy.get_param("~num_beams_per_particle"):
-            return
+        #if len(data.ranges) != rospy.get_param("~num_beams_per_particle"):
+        #    return
         #call sensor model, update probabilities
        
         with self.particles_lock:
@@ -201,6 +201,8 @@ class ParticleFilter:
                 msg.pose.pose.orientation.z = quat[2]
                 msg.pose.pose.orientation.w = quat[3]
                 self.odom_pub.publish(msg)
+                self.tf_pub.sendTransform((mu_x, mu_y, 0), quat, rospy.Time.now(), "base_link_pf", "map")
+                self.tf_pub.sendTransform((mu_x, mu_y, 0), quat, rospy.Time.now(), "base_link", "map")
 
             #Sends esimated pose to error publisher for comparing against real pose and then publishing error
             #self.error_publisher(msg)
