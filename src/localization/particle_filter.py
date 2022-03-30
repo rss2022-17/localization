@@ -99,7 +99,10 @@ class ParticleFilter:
         #Only start accepting data once initialization is done
         if not self.initIsDone:
             return
+        if len(data.ranges) != rospy.get_param("~/num_beams_per_particle"):
+            return
         #call sensor model, update probabilities
+       
         with self.particles_lock:
             self.particles_copy = self.particles
         
