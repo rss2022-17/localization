@@ -4,7 +4,6 @@
   </node>
   <include file="$(find racecar_simulator)/launch/simulate.launch">
     <!--<arg name="map" value="$(find localization)/test/maps/test_map.yaml"/>-->
-    <arg name="map" value="$(find racecar_simulator)/maps/building_31.yaml"/>-->
-    
+    <arg name="map" value="$(find racecar_simulator)/maps/stata_basement.yaml"/>
   </include>
 </launch>

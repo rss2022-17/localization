@@ -60,7 +60,7 @@ class ParticleFilter:
         #     provide the twist part of the Odometry message. The
         #     odometry you publish here should be with respect to the
         #     "/map" frame.
-        self.odom_pub  = rospy.Publisher("/pf/pose/odom", Odometry, queue_size = 1)
+        self.odom_pub  = rospy.Publisher(rospy.get_param("~particle_filter_frame", "/base_link"), Odometry, queue_size = 1)
         self.particles_pub = rospy.Publisher("/pf/particles", PoseArray, queue_size = 1)
         self.visualize = True
 
