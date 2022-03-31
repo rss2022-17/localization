@@ -6,6 +6,7 @@ import tf
 import tf2_ros
 from sensor_model import SensorModel
 from motion_model import MotionModel
+from noise import NoiseModel
 
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
@@ -79,7 +80,10 @@ class ParticleFilter:
         # and the particle_filter_frame.
 
         self.initial_pos = np.array([0.0,0.0,0.0])
-        self.particles = np.tile(self.initial_pos, (self.n_particles, 1))
+        self.init_noise = NoiseModel(1,1,np.pi/18) #params to start the initialization with
+        self.particles = np.tile(self.initial_pos, (self.n_particles, 1)) 
+        self.particles += self.init_noise.get_random_matrix(self.particles.shape)#add initialization noise (needed for real robot)
+        
         self.particles_copy = np.tile(self.initial_pos, (self.n_particles, 1))
         self.particles_ransac = np.tile(self.initial_pos, (self.n_particles, 1))
         self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
@@ -212,7 +216,7 @@ class ParticleFilter:
         theta = tf.transformations.euler_from_quaternion((data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z,data.pose.pose.orientation.w))[2]
         self.initial_pos = np.array([data.pose.pose.position.x,data.pose.pose.position.y,theta])
         with self.particles_lock:
-            self.particles = np.tile(self.initial_pos, (self.n_particles, 1))
+            self.particles = np.tile(self.initial_pos, (self.n_particles, 1)) + self.init_noise.get_random_matrix(self.particles.shape)
         with self.probs_lock:
             self.probs = np.ones(self.n_particles)/(1.0*self.n_particles)
 
