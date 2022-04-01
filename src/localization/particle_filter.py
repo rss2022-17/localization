@@ -82,7 +82,7 @@ class ParticleFilter:
         # and the particle_filter_frame.
 
         self.initial_pos = np.array([0.0,0.0,0.0])
-        self.init_noise = NoiseModel(0.2,0.2,np.pi/36) #params to start the initialization with
+        self.init_noise = NoiseModel(0.75,0.75,np.pi/6) #params to start the initialization with
         self.particles = np.tile(self.initial_pos, (self.n_particles, 1)) 
         self.particles += self.init_noise.get_random_matrix(self.particles.shape)#add initialization noise (needed for real robot)
         
@@ -116,9 +116,7 @@ class ParticleFilter:
         #if len(data.ranges) != rospy.get_param("~num_beams_per_particle"):
         #    return
         #call sensor model, update probabilities
-
-        print("[Particle Filter 110]: laser range max = ",data.range_max)
-       
+               
         with self.particles_lock:
             self.particles_copy = self.particles
         
