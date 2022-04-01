@@ -13,7 +13,7 @@ from tf.transformations import quaternion_from_euler
 class SensorModel:
 
 
-    def __init__(self, z_max=200):
+    def __init__(self, z_max=30.0):
         # Fetch parameters
         self.map_topic = rospy.get_param("~map_topic")
         self.num_beams_per_particle = rospy.get_param("~num_beams_per_particle")
@@ -75,7 +75,7 @@ class SensorModel:
             No return type. Directly modify `self.sensor_model_table`.
         """
 
-        z_max  = 200.0
+        z_max  = self.z_max
         normalization_constant = 1.0
 
         d = np.linspace(0,z_max,self.table_width,endpoint = True)
@@ -174,8 +174,8 @@ class SensorModel:
         #Now has an N by num_lidar beams matrix
         
         #Clips and scales ray cast distances
-        adjusted_ray_cast = np.rint(np.clip(scans/divisor, 0, 200.0)).astype(np.uint16) # n by m scaled and clipped 
-        adjusted_lidar_scan = np.rint(np.clip(observation/divisor, 0, 200.0)).astype(np.uint16) # n by 1cd scaled and clipped 
+        adjusted_ray_cast = np.rint(np.clip(scans/divisor, 0, self.z_max)).astype(np.uint16) # n by m scaled and clipped 
+        adjusted_lidar_scan = np.rint(np.clip(observation/divisor, 0, self.z_max)).astype(np.uint16) # n by 1cd scaled and clipped 
 
         probability_table = self.sensor_model_table[adjusted_lidar_scan, adjusted_ray_cast]
         #Turn a n by m matrix into a n by 1 (or 1 by n) vector where each element is the product of each row in the probability table

@@ -21,6 +21,7 @@ class ParticleFilter:
                 rospy.get_param("~particle_filter_frame")
 
         self.n_particles = rospy.get_param("~num_particles")
+        self.beams_per_particle = rospy.get_param("~num_beams_per_particle")
         self.initIsDone = False
 
 
@@ -103,16 +104,27 @@ class ParticleFilter:
         #Only start accepting data once initialization is done
         if not self.initIsDone:
             return
+
+        
+        # === DOWN SAMPLING LASER DATA
+        self.beams_per_particle
+        original_bpp = len(data.ranges)
+
+        original_ranges = np.array(data.ranges)
+        use_ranges = original_ranges[0:int(original_bpp/self.beams_per_particle):original_bpp]
+
         #if len(data.ranges) != rospy.get_param("~num_beams_per_particle"):
         #    return
         #call sensor model, update probabilities
+
+        print("[Particle Filter 110]: laser range max = ",data.range_max)
        
         with self.particles_lock:
             self.particles_copy = self.particles
         
         #Get and Normalize Probabilities From Sensor Model
         with self.probs_lock:
-            self.probs = self.sensor_model.evaluate(self.particles_copy, np.array(data.ranges))
+            self.probs = self.sensor_model.evaluate(self.particles_copy, use_ranges)
             if self.probs is None:
                 return
             self.probs = self.probs/np.sum(self.probs)
