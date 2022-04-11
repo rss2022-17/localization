@@ -39,7 +39,7 @@ class ParticleFilter:
         #     twist component, so you should rely only on that
         #     information, and *not* use the pose component.
         scan_topic = rospy.get_param("~scan_topic", "/scan")
-        odom_topic = rospy.get_param("~odom_topic", "/vesc/odom")
+        odom_topic = rospy.get_param("~odom_topic", "/odom")
         self.laser_sub = rospy.Subscriber(scan_topic, LaserScan,
                                           self.laser_callback, # TODO: Fill this in
                                           queue_size=1)
@@ -62,7 +62,7 @@ class ParticleFilter:
         #     provide the twist part of the Odometry message. The
         #     odometry you publish here should be with respect to the
         #     "/map" frame.
-        self.odom_pub  = rospy.Publisher(rospy.get_param("~particle_filter_frame", "/base_link"), Odometry, queue_size = 1)
+        self.odom_pub  = rospy.Publisher(rospy.get_param("~particle_filter_frame", "/pf/pose/odom"), Odometry, queue_size = 1)
         self.tf_pub = tf.TransformBroadcaster()
         self.particles_pub = rospy.Publisher("/pf/particles", PoseArray, queue_size = 1)
         self.visualize = True
